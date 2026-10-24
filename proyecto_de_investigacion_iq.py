@@ -936,7 +936,7 @@ def resolver_problema_ingenieria(mensaje, historial):
     for intento in range(max_intentos):
         try:
             response = client.models.generate_content(
-                model='gemini-3.8-flash',
+                model='gemini-1.5-flash',
                 contents=contents
             )
             return response.text
