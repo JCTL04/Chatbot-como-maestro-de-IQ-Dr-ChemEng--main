@@ -1069,7 +1069,7 @@ demo_ia_real.launch(inline=True, share=True)
 #       ):
 #         try:
 #           model = genai.GenerativeModel(
-#               model_name="gemini-3.8-flash",
+#               model_name="gemini-1.5-flash",
 #               system_instruction=SYSTEM_INSTRUCTION,
 #           )
 # 
