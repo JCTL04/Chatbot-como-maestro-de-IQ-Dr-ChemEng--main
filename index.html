@@ -116,7 +116,8 @@
             <div class="space-y-3">
                 <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Modelo IA</label>
                 <select id="modelSelect" class="w-full bg-darkBg border border-borderBg rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emeraldCustom-500 transition">
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado)</option>
+                    <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recomendado)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro (Razonamiento Complejo)</option>
                 </select>
 
@@ -490,109 +491,16 @@
             }
         }
 
-        // --- RENDERIZADO DE MENSAJES ---
-        function appendUserMessage(text, fileBase64, fileType) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'flex gap-3 max-w-3xl ml-auto justify-end';
-
-            let fileHtml = '';
-            if (fileBase64 && fileType.startsWith('image/')) {
-                fileHtml = `<img src="data:${fileType};base64,${fileBase64}" class="max-w-xs max-h-48 rounded-lg mb-2 border border-borderBg object-cover">`;
-            } else if (fileBase64) {
-                fileHtml = `<div class="p-2 bg-cardBg rounded-lg text-xs flex items-center gap-2 mb-2 border border-borderBg"><i class="fa-solid fa-file-pdf text-red-400"></i> ${attachedFileName}</div>`;
-            }
-
-            msgDiv.innerHTML = `
-                <div class="bg-emeraldCustom-600 text-white p-4 rounded-2xl rounded-tr-none max-w-2xl shadow-md">
-                    ${fileHtml}
-                    <p class="text-sm whitespace-pre-wrap">${escapeHtml(text)}</p>
-                </div>
-                <div class="w-8 h-8 rounded-full bg-emeraldCustom-500/20 text-emeraldCustom-400 border border-emeraldCustom-500/40 flex items-center justify-center font-bold text-xs shrink-0">
-                    TÚ
-                </div>
-            `;
-            chatContainer.appendChild(msgDiv);
-            scrollToBottom();
-        }
-
-        function appendBotMessage(markdownText, isWarning = false) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'flex gap-3 max-w-3xl mr-auto';
-
-            const parsedMarkdown = marked.parse(markdownText);
-
-            msgDiv.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-cyanCustom-500/20 text-cyanCustom-400 border border-cyanCustom-500/40 flex items-center justify-center text-sm shrink-0 mt-1">
-                    <i class="fa-solid fa-robot"></i>
-                </div>
-                <div class="bg-panelBg border border-borderBg p-5 rounded-2xl rounded-tl-none max-w-2xl text-slate-200 text-sm space-y-3 shadow-xl overflow-hidden">
-                    <div class="prose prose-invert max-w-none text-sm leading-relaxed">${parsedMarkdown}</div>
-                </div>
-            `;
-
-            chatContainer.appendChild(msgDiv);
-            
-            // Re-renderizar LaTeX con MathJax
-            if (window.MathJax) {
-                MathJax.typesetPromise([msgDiv]);
-            }
-
-            // Agregar botones de copiar a bloques de código Python
-            msgDiv.querySelectorAll('pre code').forEach((codeBlock) => {
-                const pre = codeBlock.parentNode;
-                pre.classList.add('relative', 'bg-darkBg', 'p-3', 'rounded-lg', 'border', 'border-borderBg', 'mt-2', 'mb-2');
-                
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'absolute top-2 right-2 bg-cardBg hover:bg-borderBg text-slate-400 text-[10px] px-2 py-1 rounded transition';
-                copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar';
-                copyBtn.onclick = () => {
-                    navigator.clipboard.writeText(codeBlock.innerText);
-                    copyBtn.innerHTML = '<i class="fa-solid fa-check text-emeraldCustom-500"></i> Copiado';
-                    setTimeout(() => copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar', 2000);
-                };
-                pre.appendChild(copyBtn);
-            });
-
-            scrollToBottom();
-        }
-
-        function appendLoadingMessage() {
-            const id = 'loading_' + Date.now();
-            const msgDiv = document.createElement('div');
-            msgDiv.id = id;
-            msgDiv.className = 'flex gap-3 max-w-3xl mr-auto';
-            msgDiv.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-cyanCustom-500/20 text-cyanCustom-400 border border-cyanCustom-500/40 flex items-center justify-center text-sm shrink-0">
-                    <i class="fa-solid fa-flask animate-spin"></i>
-                </div>
-                <div class="bg-panelBg border border-borderBg p-4 rounded-2xl rounded-tl-none text-slate-400 text-xs flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emeraldCustom-500 animate-ping"></span>
-                    Consultando biblioteca RAG y calculando solución numéricamente...
-                </div>
-            `;
-            chatContainer.appendChild(msgDiv);
-            scrollToBottom();
-            return id;
-        }
-
-        function removeLoadingMessage(id) {
-            const el = document.getElementById(id);
-            if (el) el.remove();
-        }
-
-        function scrollToBottom() {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
         // --- CONEXIÓN API GEMINI CLIENTE ---
         async function callGeminiAPI(userText, fileData) {
-            const selectedModel = modelSelect.value;
-            const temperature = parseFloat(tempInput.value);
+            let selectedModel = modelSelect.value;
+            
+            // Forzar el modelo oficial actual para evitar errores de deprecación
+            if (selectedModel.includes("2.5") || !selectedModel) {
+                selectedModel = "gemini-3.8-flash";
+            }
 
+            const temperature = parseFloat(tempInput.value);
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${currentApiKey}`;
 
             const parts = [];
@@ -733,6 +641,104 @@ Se ha verificado la sintaxis matemática y la coherencia dimensional según las 
             }
 
             appendBotMessage(respuesta);
+        }
+
+        // --- RENDERIZADO DE MENSAJES ---
+        function appendUserMessage(text, fileBase64, fileType) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex gap-3 max-w-3xl ml-auto justify-end';
+
+            let fileHtml = '';
+            if (fileBase64 && fileType.startsWith('image/')) {
+                fileHtml = `<img src="data:${fileType};base64,${fileBase64}" class="max-w-xs max-h-48 rounded-lg mb-2 border border-borderBg object-cover">`;
+            } else if (fileBase64) {
+                fileHtml = `<div class="p-2 bg-cardBg rounded-lg text-xs flex items-center gap-2 mb-2 border border-borderBg"><i class="fa-solid fa-file-pdf text-red-400"></i> ${attachedFileName}</div>`;
+            }
+
+            msgDiv.innerHTML = `
+                <div class="bg-emeraldCustom-600 text-white p-4 rounded-2xl rounded-tr-none max-w-2xl shadow-md">
+                    ${fileHtml}
+                    <p class="text-sm whitespace-pre-wrap">${escapeHtml(text)}</p>
+                </div>
+                <div class="w-8 h-8 rounded-full bg-emeraldCustom-500/20 text-emeraldCustom-400 border border-emeraldCustom-500/40 flex items-center justify-center font-bold text-xs shrink-0">
+                    TÚ
+                </div>
+            `;
+            chatContainer.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function appendBotMessage(markdownText, isWarning = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex gap-3 max-w-3xl mr-auto';
+
+            const parsedMarkdown = marked.parse(markdownText);
+
+            msgDiv.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-cyanCustom-500/20 text-cyanCustom-400 border border-cyanCustom-500/40 flex items-center justify-center text-sm shrink-0 mt-1">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="bg-panelBg border border-borderBg p-5 rounded-2xl rounded-tl-none max-w-2xl text-slate-200 text-sm space-y-3 shadow-xl overflow-hidden">
+                    <div class="prose prose-invert max-w-none text-sm leading-relaxed">${parsedMarkdown}</div>
+                </div>
+            `;
+
+            chatContainer.appendChild(msgDiv);
+            
+            // Re-renderizar LaTeX con MathJax
+            if (window.MathJax) {
+                MathJax.typesetPromise([msgDiv]);
+            }
+
+            // Agregar botones de copiar a bloques de código Python
+            msgDiv.querySelectorAll('pre code').forEach((codeBlock) => {
+                const pre = codeBlock.parentNode;
+                pre.classList.add('relative', 'bg-darkBg', 'p-3', 'rounded-lg', 'border', 'border-borderBg', 'mt-2', 'mb-2');
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'absolute top-2 right-2 bg-cardBg hover:bg-borderBg text-slate-400 text-[10px] px-2 py-1 rounded transition';
+                copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(codeBlock.innerText);
+                    copyBtn.innerHTML = '<i class="fa-solid fa-check text-emeraldCustom-500"></i> Copiado';
+                    setTimeout(() => copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar', 2000);
+                };
+                pre.appendChild(copyBtn);
+            });
+
+            scrollToBottom();
+        }
+
+        function appendLoadingMessage() {
+            const id = 'loading_' + Date.now();
+            const msgDiv = document.createElement('div');
+            msgDiv.id = id;
+            msgDiv.className = 'flex gap-3 max-w-3xl mr-auto';
+            msgDiv.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-cyanCustom-500/20 text-cyanCustom-400 border border-cyanCustom-500/40 flex items-center justify-center text-sm shrink-0">
+                    <i class="fa-solid fa-flask animate-spin"></i>
+                </div>
+                <div class="bg-panelBg border border-borderBg p-4 rounded-2xl rounded-tl-none text-slate-400 text-xs flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emeraldCustom-500 animate-ping"></span>
+                    Consultando biblioteca RAG y calculando solución numéricamente...
+                </div>
+            `;
+            chatContainer.appendChild(msgDiv);
+            scrollToBottom();
+            return id;
+        }
+
+        function removeLoadingMessage(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
     </script>
 </body>
